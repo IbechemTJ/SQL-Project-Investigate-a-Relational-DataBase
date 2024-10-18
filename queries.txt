@@ -1,0 +1,65 @@
+/* Query 1 - Query used for first insight*/
+SELECT DATE_PART('month', rental_date) AS rental_month,
+       DATE_PART('year', rental_date) AS rental_year,
+       s1.store_id,
+       COUNT(rental_id) AS rental_count
+  FROM store AS s1
+  JOIN staff AS s2 ON s1.store_id = s2.store_id
+  JOIN rental AS r ON s2.staff_id = r.staff_id
+ GROUP BY 1, 2, 3
+ ORDER BY rental_count DESC;
+
+
+/* Query 2 - Used for second insight */
+SELECT film_title,
+       category_name,
+       COUNT(rental_id) AS rental_count
+  FROM (SELECT f.title AS film_title,
+	       c.name AS category_name,
+	       r.rental_id
+	  FROM category c
+	  JOIN film_category fc ON c.category_id = fc.category_id
+	  JOIN film f ON f.film_id = fc.film_id
+	  JOIN inventory i ON i.film_id = f.film_id
+	  JOIN rental r ON r.inventory_id = i.inventory_id
+         WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')) AS sub
+ GROUP BY 1, 2
+ ORDER BY 2, 1;
+
+
+/* Query 3 - Used for third insight */
+SELECT DATE_TRUNC('month', payment_date) AS pay_mon,
+       CONCAT(first_name,' ', last_name) AS full_name,
+       COUNT(payment_id) AS pay_countpermon,
+       SUM(amount) pay_amount
+  FROM customer AS c
+  JOIN payment AS p ON p.customer_id = c.customer_id
+ WHERE DATE_TRUNC('month', payment_date) >= '2007-01-01' 
+   AND DATE_TRUNC('month', payment_date) < '2008-01-01'
+   AND CONCAT(first_name,' ', last_name) IN (SELECT full_name
+  		      			       FROM (SELECT CONCAT(first_name,' ', last_name) AS full_name,
+	                                                    SUM(amount) AS total_amount
+              		                               FROM customer AS c
+          			                       JOIN payment AS p ON p.customer_id = c.customer_id
+                                                      GROUP BY full_name
+                                                      ORDER BY total_amount DESC
+                                                      LIMIT 10)AS sub)  
+ GROUP BY pay_mon, full_name
+ ORDER BY full_name, pay_mon;
+
+
+/* Query 4 - Used for fourth insight */
+SELECT movie_title, 
+       category_name, 
+       rent_duration, 
+       quartile
+  FROM (SELECT f.title AS movie_title,
+	       c.name AS category_name,
+	       f.rental_duration AS rent_duration,
+	       NTILE(4) OVER (ORDER BY f.rental_duration) AS quartile
+	  FROM category c
+	  JOIN film_category fc 
+            ON c.category_id = fc.category_id
+	  JOIN film f 
+            ON f.film_id = fc.film_id
+         WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')) AS sub;
